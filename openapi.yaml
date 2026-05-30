@@ -1,0 +1,563 @@
+openapi: 3.0.1
+info:
+  title: Global Class Offering Booking System
+  description: |
+    Backend API for a global live-learning platform.
+    Teachers create offerings and sessions; parents browse and book them.
+    All session times are stored in UTC and returned in the caller's timezone.
+  version: 1.0.0
+  contact:
+    name: Booking System Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Teachers
+    description: Teacher registration and their offerings
+  - name: Courses
+    description: Course catalog — creation requires a valid teacherId (teacher-only action)
+  - name: Offerings
+    description: Offering creation, session management, and browsing
+  - name: Parents
+    description: Parent registration and their bookings
+  - name: Bookings
+    description: Booking creation and conflict enforcement
+
+paths:
+
+  /api/teachers:
+    post:
+      tags: [Teachers]
+      summary: Register a teacher
+      description: |
+        Creates a teacher profile. The `timezone` field (e.g. `Asia/Kolkata`) is stored
+        and used to interpret session times when the teacher adds sessions to their offerings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTeacherRequest'
+            example:
+              name: Alice Smith
+              email: alice@school.com
+              timezone: Asia/Kolkata
+      responses:
+        '201':
+          description: Teacher registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherResponse'
+        '400':
+          description: Missing or invalid fields
+          content:
+            application/json:
+              example:
+                status: 400
+                message: "email: must be a well-formed email address"
+                timestamp: "2025-05-30T10:00:00Z"
+        '409':
+          description: Email already in use
+          content:
+            application/json:
+              example:
+                status: 409
+                message: "A user with this email already exists"
+                timestamp: "2025-05-30T10:00:00Z"
+
+  /api/teachers/{teacherId}/offerings:
+    get:
+      tags: [Teachers]
+      summary: Get teacher offerings
+      description: Returns all offerings created by the teacher, with sessions shown in the teacher's own timezone.
+      parameters:
+        - name: teacherId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of offerings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OfferingResponse'
+        '404':
+          description: Teacher not found
+
+  /api/courses:
+    post:
+      tags: [Courses]
+      summary: Create a course (teacher only)
+      description: |
+        Registers a new course in the catalog.
+        **Requires a valid `teacherId`** — only registered teachers can create courses.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCourseRequest'
+            example:
+              teacherId: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              name: Python Coding
+              description: Learn Python from scratch through fun projects
+      responses:
+        '201':
+          description: Course created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseResponse'
+        '400':
+          description: Missing or invalid fields
+        '404':
+          description: Teacher not found
+    get:
+      tags: [Courses]
+      summary: List all courses
+      description: Returns every course in the catalog. Open to all users.
+      responses:
+        '200':
+          description: Course list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CourseResponse'
+
+  /api/offerings:
+    post:
+      tags: [Offerings]
+      summary: Create an offering
+      description: Creates a new offering (section) for a course, associated with a teacher. Sessions are added separately.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOfferingRequest'
+            example:
+              courseId: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              teacherId: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              title: Saturday Morning Batch
+      responses:
+        '201':
+          description: Offering created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfferingResponse'
+        '404':
+          description: Course or Teacher not found
+    get:
+      tags: [Offerings]
+      summary: Browse active offerings
+      description: |
+        Returns all active offerings with their sessions.
+        Pass `timezone` to view session times in the caller's local timezone. Defaults to UTC.
+      parameters:
+        - name: timezone
+          in: query
+          required: false
+          description: IANA timezone (e.g. America/New_York). Defaults to UTC.
+          schema:
+            type: string
+            example: America/New_York
+      responses:
+        '200':
+          description: Active offerings with sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OfferingResponse'
+        '400':
+          description: Invalid timezone
+
+  /api/offerings/{offeringId}/sessions:
+    post:
+      tags: [Offerings]
+      summary: Add sessions to an offering
+      description: |
+        Adds one or more sessions to an existing offering.
+        Times must be ISO local date-time strings (e.g. `2025-06-07T18:00:00`) in the **teacher's timezone**.
+        The system converts them to UTC for storage.
+      parameters:
+        - name: offeringId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddSessionsRequest'
+            example:
+              sessions:
+                - startTime: "2025-06-07T18:00:00"
+                  endTime: "2025-06-07T19:00:00"
+                - startTime: "2025-06-14T18:00:00"
+                  endTime: "2025-06-14T19:00:00"
+                - startTime: "2025-06-21T18:00:00"
+                  endTime: "2025-06-21T19:00:00"
+      responses:
+        '201':
+          description: Sessions added
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SessionResponse'
+        '400':
+          description: Invalid time range or missing fields
+        '404':
+          description: Offering not found
+        '409':
+          description: Offering is cancelled
+
+  /api/offerings/{offeringId}:
+    delete:
+      tags: [Offerings]
+      summary: Cancel an offering
+      description: Marks the offering as CANCELLED and cascade-cancels all confirmed bookings for it.
+      parameters:
+        - name: offeringId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Offering cancelled
+        '404':
+          description: Offering not found
+        '409':
+          description: Offering is already cancelled
+
+  /api/parents:
+    post:
+      tags: [Parents]
+      summary: Register a parent/student
+      description: |
+        Creates a parent profile. The `timezone` field is stored and used
+        as the default when viewing session times in bookings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateParentRequest'
+            example:
+              name: Jane Doe
+              email: jane@example.com
+              timezone: America/New_York
+      responses:
+        '201':
+          description: Parent registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParentResponse'
+        '400':
+          description: Missing or invalid fields
+        '409':
+          description: Email already in use
+
+  /api/parents/{parentId}/bookings:
+    get:
+      tags: [Parents]
+      summary: Get parent bookings
+      description: |
+        Returns all bookings for the parent. Session times are shown in the parent's stored timezone
+        by default. Pass `timezone` to override.
+      parameters:
+        - name: parentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: timezone
+          in: query
+          required: false
+          description: Optional IANA timezone override. Defaults to parent's stored timezone.
+          schema:
+            type: string
+            example: Asia/Tokyo
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookingResponse'
+        '404':
+          description: Parent not found
+
+  /api/bookings:
+    post:
+      tags: [Bookings]
+      summary: Book an offering
+      description: |
+        Books an entire offering for a parent. Enforces three rules:
+        1. A parent cannot book the same offering twice.
+        2. A parent cannot book an offering whose sessions overlap with any already-booked sessions.
+        3. Concurrent booking attempts are serialised via a pessimistic write lock on the parent row.
+
+        Pass `timezone` to receive session times in that timezone in the response.
+      parameters:
+        - name: timezone
+          in: query
+          required: false
+          description: IANA timezone for the response. Defaults to parent's stored timezone.
+          schema:
+            type: string
+            example: Asia/Kolkata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookOfferingRequest'
+            example:
+              parentId: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+              offeringId: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+      responses:
+        '201':
+          description: Booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '404':
+          description: Parent or Offering not found
+        '409':
+          description: Duplicate booking or time conflict
+          content:
+            application/json:
+              examples:
+                duplicate:
+                  summary: Already booked
+                  value:
+                    status: 409
+                    message: "You have already booked this offering"
+                    timestamp: "2025-05-30T10:00:00Z"
+                conflict:
+                  summary: Time conflict
+                  value:
+                    status: 409
+                    message: "Time conflict: a session in this offering overlaps with an existing booking"
+                    timestamp: "2025-05-30T10:00:00Z"
+                cancelled:
+                  summary: Offering cancelled
+                  value:
+                    status: 409
+                    message: "Offering is not available for booking"
+                    timestamp: "2025-05-30T10:00:00Z"
+
+components:
+  schemas:
+
+    CreateTeacherRequest:
+      type: object
+      required: [name, email, timezone]
+      properties:
+        name:
+          type: string
+          example: Alice Smith
+        email:
+          type: string
+          format: email
+          example: alice@school.com
+        timezone:
+          type: string
+          description: IANA timezone identifier
+          example: Asia/Kolkata
+
+    TeacherResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        timezone:
+          type: string
+
+    CreateCourseRequest:
+      type: object
+      required: [teacherId, name]
+      properties:
+        teacherId:
+          type: string
+          format: uuid
+          description: Must be a registered teacher's ID
+        name:
+          type: string
+          example: Python Coding
+        description:
+          type: string
+          example: Learn Python from scratch
+
+    CourseResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+
+    CreateOfferingRequest:
+      type: object
+      required: [courseId, teacherId, title]
+      properties:
+        courseId:
+          type: string
+          format: uuid
+        teacherId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Saturday Morning Batch
+
+    AddSessionsRequest:
+      type: object
+      required: [sessions]
+      properties:
+        sessions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [startTime, endTime]
+            properties:
+              startTime:
+                type: string
+                description: ISO local date-time in teacher's timezone
+                example: "2025-06-07T18:00:00"
+              endTime:
+                type: string
+                description: ISO local date-time in teacher's timezone
+                example: "2025-06-07T19:00:00"
+
+    CreateParentRequest:
+      type: object
+      required: [name, email, timezone]
+      properties:
+        name:
+          type: string
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        timezone:
+          type: string
+          description: IANA timezone identifier
+          example: America/New_York
+
+    ParentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        timezone:
+          type: string
+
+    BookOfferingRequest:
+      type: object
+      required: [parentId, offeringId]
+      properties:
+        parentId:
+          type: string
+          format: uuid
+        offeringId:
+          type: string
+          format: uuid
+
+    SessionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        offeringId:
+          type: string
+          format: uuid
+        teacherId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          description: In the requested timezone
+          example: "2025-06-07T08:30:00"
+        endTime:
+          type: string
+          example: "2025-06-07T09:30:00"
+        timezone:
+          type: string
+          example: America/New_York
+
+    OfferingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, CANCELLED]
+        course:
+          $ref: '#/components/schemas/CourseResponse'
+        teacherName:
+          type: string
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResponse'
+
+    BookingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [CONFIRMED, CANCELLED]
+        bookedAt:
+          type: string
+          format: date-time
+        offering:
+          $ref: '#/components/schemas/OfferingResponse'

@@ -1,0 +1,602 @@
+{
+  "info": {
+    "name": "Global Class Offering Booking System",
+    "description": "Complete API test collection for the booking system. Run requests in order — each step uses IDs from the previous response. Variables are auto-captured via test scripts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "teacherId", "value": "", "type": "string" },
+    { "key": "courseId", "value": "", "type": "string" },
+    { "key": "offeringId", "value": "", "type": "string" },
+    { "key": "offeringId2", "value": "", "type": "string" },
+    { "key": "parentId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Teachers",
+      "item": [
+        {
+          "name": "1.1 Register Teacher",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('teacherId', res.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has id', () => pm.expect(res.id).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/teachers",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Smith\",\n  \"email\": \"alice@school.com\",\n  \"timezone\": \"Asia/Kolkata\"\n}"
+            }
+          }
+        },
+        {
+          "name": "1.2 Register Teacher — Duplicate Email (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 on duplicate email', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/teachers",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Copy\",\n  \"email\": \"alice@school.com\",\n  \"timezone\": \"Asia/Kolkata\"\n}"
+            }
+          }
+        },
+        {
+          "name": "1.3 Register Teacher — Invalid Timezone (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 on bad timezone', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/teachers",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bad Teacher\",\n  \"email\": \"bad@school.com\",\n  \"timezone\": \"NotATimezone\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Courses",
+      "item": [
+        {
+          "name": "2.1 Create Course (teacher only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('courseId', res.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has id', () => pm.expect(res.id).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/courses",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teacherId\": \"{{teacherId}}\",\n  \"name\": \"Python Coding\",\n  \"description\": \"Learn Python from scratch through fun projects\"\n}"
+            }
+          }
+        },
+        {
+          "name": "2.2 Create Course — Unknown Teacher (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 on unknown teacher', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/courses",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teacherId\": \"00000000-0000-0000-0000-000000000000\",\n  \"name\": \"Ghost Course\"\n}"
+            }
+          }
+        },
+        {
+          "name": "2.3 List All Courses",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/courses"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Offerings",
+      "item": [
+        {
+          "name": "3.1 Create Offering",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('offeringId', res.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Status is ACTIVE', () => pm.expect(res.status).to.equal('ACTIVE'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/offerings",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseId\": \"{{courseId}}\",\n  \"teacherId\": \"{{teacherId}}\",\n  \"title\": \"Saturday Morning Batch\"\n}"
+            }
+          }
+        },
+        {
+          "name": "3.2 Add Sessions to Offering",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('3 sessions created', () => pm.expect(res).to.have.lengthOf(3));",
+                  "pm.test('Times in IST', () => pm.expect(res[0].timezone).to.equal('Asia/Kolkata'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/offerings/{{offeringId}}/sessions",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessions\": [\n    {\n      \"startTime\": \"2025-06-07T18:00:00\",\n      \"endTime\": \"2025-06-07T19:00:00\"\n    },\n    {\n      \"startTime\": \"2025-06-14T18:00:00\",\n      \"endTime\": \"2025-06-14T19:00:00\"\n    },\n    {\n      \"startTime\": \"2025-06-21T18:00:00\",\n      \"endTime\": \"2025-06-21T19:00:00\"\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "3.3 Add Sessions — End Before Start (expect 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 on invalid time range', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/offerings/{{offeringId}}/sessions",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessions\": [\n    {\n      \"startTime\": \"2025-06-28T19:00:00\",\n      \"endTime\": \"2025-06-28T18:00:00\"\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "3.4 Browse Active Offerings (UTC)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/offerings"
+          }
+        },
+        {
+          "name": "3.5 Browse Active Offerings (New York timezone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('Timezone is New York', () => pm.expect(res[0].sessions[0].timezone).to.equal('America/New_York'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/offerings?timezone=America/New_York",
+              "query": [{ "key": "timezone", "value": "America/New_York" }]
+            }
+          }
+        },
+        {
+          "name": "3.6 Get Teacher Offerings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('Timezone is IST', () => pm.expect(res[0].sessions[0].timezone).to.equal('Asia/Kolkata'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/teachers/{{teacherId}}/offerings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Parents",
+      "item": [
+        {
+          "name": "4.1 Register Parent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('parentId', res.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has timezone', () => pm.expect(res.timezone).to.equal('America/New_York'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/parents",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"timezone\": \"America/New_York\"\n}"
+            }
+          }
+        },
+        {
+          "name": "4.2 Register Parent — Duplicate Email (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 on duplicate email', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/parents",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Copy\",\n  \"email\": \"jane@example.com\",\n  \"timezone\": \"America/New_York\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Bookings",
+      "item": [
+        {
+          "name": "5.1 Book Offering (success)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "pm.test('Status CONFIRMED', () => pm.expect(res.status).to.equal('CONFIRMED'));",
+                  "pm.test('Sessions in New York time', () => pm.expect(res.offering.sessions[0].timezone).to.equal('America/New_York'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings?timezone=America/New_York",
+              "query": [{ "key": "timezone", "value": "America/New_York" }]
+            },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentId\": \"{{parentId}}\",\n  \"offeringId\": \"{{offeringId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "5.2 Book Same Offering Again — Duplicate (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 on duplicate booking', () => pm.response.to.have.status(409));",
+                  "pm.test('Correct message', () => pm.expect(pm.response.json().message).to.include('already booked'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/bookings",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentId\": \"{{parentId}}\",\n  \"offeringId\": \"{{offeringId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "5.3 View Parent Bookings (stored timezone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('Has 1 booking', () => pm.expect(res).to.have.lengthOf(1));",
+                  "pm.test('Status CONFIRMED', () => pm.expect(res[0].status).to.equal('CONFIRMED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/parents/{{parentId}}/bookings"
+          }
+        },
+        {
+          "name": "5.4 View Parent Bookings (timezone override)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('Timezone is Tokyo', () => pm.expect(res[0].offering.sessions[0].timezone).to.equal('Asia/Tokyo'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/parents/{{parentId}}/bookings?timezone=Asia/Tokyo",
+              "query": [{ "key": "timezone", "value": "Asia/Tokyo" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Conflict Detection",
+      "item": [
+        {
+          "name": "6.1 Create Second Offering (same course)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.collectionVariables.set('offeringId2', res.id);",
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/offerings",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseId\": \"{{courseId}}\",\n  \"teacherId\": \"{{teacherId}}\",\n  \"title\": \"Roblox Game Design\"\n}"
+            }
+          }
+        },
+        {
+          "name": "6.2 Add Overlapping Session to Second Offering",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/offerings/{{offeringId2}}/sessions",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessions\": [\n    {\n      \"startTime\": \"2025-06-14T17:30:00\",\n      \"endTime\": \"2025-06-14T18:30:00\"\n    }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "6.3 Book Overlapping Offering — Conflict (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 on time conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Correct message', () => pm.expect(pm.response.json().message).to.include('Time conflict'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/bookings",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentId\": \"{{parentId}}\",\n  \"offeringId\": \"{{offeringId2}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Cancellation",
+      "item": [
+        {
+          "name": "7.1 Cancel Offering (cascades to bookings)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/offerings/{{offeringId}}"
+          }
+        },
+        {
+          "name": "7.2 Verify Booking is Cancelled",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const res = pm.response.json();",
+                  "pm.test('Booking now CANCELLED', () => pm.expect(res[0].status).to.equal('CANCELLED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/parents/{{parentId}}/bookings"
+          }
+        },
+        {
+          "name": "7.3 Try to Book Cancelled Offering (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 on cancelled offering', () => pm.response.to.have.status(409));",
+                  "pm.test('Correct message', () => pm.expect(pm.response.json().message).to.include('not available'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/bookings",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"parentId\": \"{{parentId}}\",\n  \"offeringId\": \"{{offeringId}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "7.4 Cancel Already-Cancelled Offering (expect 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/api/offerings/{{offeringId}}"
+          }
+        }
+      ]
+    }
+  ]
+}
